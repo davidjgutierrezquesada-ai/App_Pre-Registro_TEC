@@ -201,7 +201,7 @@ with tab_ges:
             st.metric(label="Menores de Edad Activos", value=menores_activos)
             
     st.write("---")
-    st.link_button("📊 Abrir Base de Datos Central (Google Sheets)", url=https://docs.google.com/spreadsheets/d/1UAWXhHxnvRpGMfnfvSDizyfsdi0Dd7r10LyEzuSmMz4/edit?usp=sharing)
+    st.link_button("📊 Abrir Base de Datos Central (Google Sheets)", url="https://docs.google.com/spreadsheets/d/1UAWXhHxnvRpGMfnfvSDizyfsdi0Dd7r10LyEzuSmMz4/edit?usp=sharing")
     
     col_export_1, col_export_2 = st.columns([3, 1])
     with col_export_1:
