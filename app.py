@@ -8,10 +8,8 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 
-# --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Pre-Registro Inteligente - Clínica", page_icon="🏥", layout="centered")
 
-# --- CONEXIÓN A GOOGLE SHEETS DIRECTA ---
 def conectar_gsheets():
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -77,17 +75,14 @@ def generar_csv(datos):
         writer.writerows(datos)
     return output.getvalue().encode('utf-8')
 
-# Inicializar DB en estado de sesión desde la nube
 if 'db' not in st.session_state:
     st.session_state.db = cargar_base_datos()
 
-# --- INTERFAZ PRINCIPAL ---
 st.title("🏥 Sistema de Pre-Registro Inteligente")
 st.markdown("Sistema de validación rápida y control de emergencias (Conectado a la Nube).")
 
 tab_enf, tab_rec, tab_ges = st.tabs(["🩺 Enfermería", "🚨 Recepción", "⚙️ Gestión"])
 
-# --- PESTAÑA 1: ENFERMERÍA ---
 with tab_enf:
     st.header("Control Rutinario - Toma de Signos Vitales")
     st.caption("💡 Ingrese la cédula sin guiones para verificar o registrar a un paciente.")
@@ -145,7 +140,6 @@ with tab_enf:
                             del st.session_state['enf_cedula']
                         st.rerun()
 
-# --- PESTAÑA 2: RECEPCIÓN ---
 with tab_rec:
     st.header("Módulo de Consulta Rápida - Emergencias")
     st.caption("💡 Buscador Universal: Ingrese nombre completo, cédula o carné/código.")
@@ -192,7 +186,6 @@ with tab_rec:
             else:
                 st.error("❌ Paciente no encontrado. Aplique el protocolo alternativo de emergencia.")
 
-# --- PESTAÑA 3: GESTIÓN ---
 with tab_ges:
     st.header("Administración de Registros y Control WIP")
     
