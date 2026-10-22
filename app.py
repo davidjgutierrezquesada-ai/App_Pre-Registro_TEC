@@ -5,24 +5,36 @@ import csv
 import io
 import urllib.parse
 from datetime import datetime
-from streamlit_gsheets import GSheetsConnection
+import gspread
+from google.oauth2.service_account import Credentials
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Pre-Registro Inteligente - Clínica", page_icon="🏥", layout="centered")
 
-# --- CONEXIÓN A LA BASE DE DATOS EN LA NUBE (Google Sheets) ---
-conn = st.connection("gsheets", type=GSheetsConnection)
+# --- CONEXIÓN A GOOGLE SHEETS DIRECTA ---
+def conectar_gsheets():
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    creds_dict = dict(st.secrets["connections"]["gsheets"])
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    client = gspread.authorize(creds)
+    sh = client.open("DB_Central_Clinica_TEC")
+    return sh
 
 def cargar_base_datos():
     try:
-        # Lee la pestaña "Pacientes" de tu Google Sheet
-        df = conn.read(worksheet="Pacientes", ttl=0)
+        sh = conectar_gsheets()
+        worksheet = sh.worksheet("Pacientes")
+        data = worksheet.get_all_records()
+        df = pd.DataFrame(data)
+        if df.empty:
+            return []
         df = df.dropna(subset=["cedula"])
-        # Limpiamos posibles valores nulos convirtiéndolos a string limpio
         df = df.fillna("")
         return df.to_dict(orient="records")
     except Exception as e:
-        # Datos iniciales de respaldo si la hoja está vacía o hay error de conexión
         return [
             {"cedula": "111111111", "carne": "20261001", "nombre": "Juan Carlos Pérez Morales", "fecha_nac": "15/04/2005", "contacto": "8888-1111", "es_menor": "SI", "ultima_verificacion": "15/09/2026"},
             {"cedula": "222222222", "carne": "20261002", "nombre": "María Sofía Rojas Valverde", "fecha_nac": "20/08/2000", "contacto": "N/A (Mayor de edad)", "es_menor": "NO", "ultima_verificacion": "15/09/2026"}
@@ -30,9 +42,12 @@ def cargar_base_datos():
 
 def guardar_base_datos(db):
     try:
+        sh = conectar_gsheets()
+        worksheet = sh.worksheet("Pacientes")
         df_nuevo = pd.DataFrame(db)
-        # Actualiza la hoja "Pacientes" en Google Sheets en tiempo real
-        conn.update(worksheet="Pacientes", data=df_nuevo)
+        worksheet.clear()
+        if not df_nuevo.empty:
+            worksheet.update([df_nuevo.columns.values.tolist()] + df_nuevo.values.tolist())
     except Exception as e:
         st.error(f"Error al sincronizar con la nube: {e}")
 
@@ -177,7 +192,7 @@ with tab_rec:
             else:
                 st.error("❌ Paciente no encontrado. Aplique el protocolo alternativo de emergencia.")
 
-# --- PESTAÑA 3: GESTIÓN (Con Panel WIP integrado) ---
+# --- PESTAÑA 3: GESTIÓN ---
 with tab_ges:
     st.header("Administración de Registros y Control WIP")
     
