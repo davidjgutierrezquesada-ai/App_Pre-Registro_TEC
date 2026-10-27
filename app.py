@@ -33,10 +33,7 @@ def cargar_base_datos():
         df = df.fillna("")
         return df.to_dict(orient="records")
     except Exception as e:
-        return [
-            {"cedula": "111111111", "carne": "20261001", "nombre": "Juan Carlos Pérez Morales", "fecha_nac": "15/04/2005", "contacto": "8888-1111", "es_menor": "SI", "ultima_verificacion": "15/09/2026"},
-            {"cedula": "222222222", "carne": "20261002", "nombre": "María Sofía Rojas Valverde", "fecha_nac": "20/08/2000", "contacto": "N/A (Mayor de edad)", "es_menor": "NO", "ultima_verificacion": "15/09/2026"}
-        ]
+        return []
 
 def guardar_base_datos(db):
     try:
@@ -105,8 +102,9 @@ with tab_enf:
         with st.form("form_nuevo_paciente"):
             carne = st.text_input("Carné Institucional / Código Funcionario:")
             nombre = st.text_input("Nombre Completo:")
-            fnac = st.text_input("Fecha de Nacimiento (DD/MM/YYYY):", placeholder="Ej: 8/6/2006 o 08/06/2006")
-            contacto = st.text_input("Teléfono Emergencia (Obligatorio si es menor):")
+            fnac = st.text_input("Fecha de Nacimiento (DD/MM/YYYY):", placeholder="Ej: 08/06/2006")
+            # El contacto ahora es obligatorio para TODOS
+            contacto = st.text_input("Contacto de Emergencia (Obligatorio para todos los pacientes):", placeholder="Nombre y Teléfono")
             
             submitted = st.form_submit_button("Guardar Pre-Registro")
             if submitted:
@@ -114,31 +112,30 @@ with tab_enf:
                 
                 if not fecha_obj:
                     st.error("🚨 Formato de fecha incorrecto. Use el formato Día/Mes/Año (Ej: 15/04/2005).")
+                elif not contacto.strip():
+                    st.error("🚨 El contacto de emergencia es estrictamente obligatorio para todos los pacientes.")
                 else:
                     edad = calcular_edad(fecha_obj)
                     es_menor = "SI" if edad < 18 else "NO"
                     
-                    if es_menor == "SI" and not contacto.strip():
-                        st.error("🚨 El paciente es menor de edad. Debe ingresar obligatoriamente un número de contacto.")
-                    else:
-                        nuevo_registro = {
-                            "cedula": str(cedula_enf),
-                            "carne": carne.strip(),
-                            "nombre": nombre.strip(),
-                            "fecha_nac": fecha_formateada,
-                            "contacto": contacto.strip() if es_menor == "SI" else "N/A (Mayor de edad)",
-                            "es_menor": es_menor,
-                            "ultima_verificacion": datetime.now().strftime("%d/%m/%Y")
-                        }
-                        st.session_state.db.append(nuevo_registro)
-                        guardar_base_datos(st.session_state.db)
-                        
-                        st.success(f"Registro guardado con éxito en la nube. Edad calculada: {edad} años.")
-                        time.sleep(2.5)
-                        st.session_state.mostrar_formulario_nuevo = False
-                        if 'enf_cedula' in st.session_state:
-                            del st.session_state['enf_cedula']
-                        st.rerun()
+                    nuevo_registro = {
+                        "cedula": str(cedula_enf),
+                        "carne": carne.strip(),
+                        "nombre": nombre.strip(),
+                        "fecha_nac": fecha_formateada,
+                        "contacto": contacto.strip(),
+                        "es_menor": es_menor,
+                        "ultima_verificacion": datetime.now().strftime("%d/%m/%Y")
+                    }
+                    st.session_state.db.append(nuevo_registro)
+                    guardar_base_datos(st.session_state.db)
+                    
+                    st.success(f"Registro guardado con éxito en la nube. Edad calculada: {edad} años.")
+                    time.sleep(2.5)
+                    st.session_state.mostrar_formulario_nuevo = False
+                    if 'enf_cedula' in st.session_state:
+                        del st.session_state['enf_cedula']
+                    st.rerun()
 
 with tab_rec:
     st.header("Módulo de Consulta Rápida - Emergencias")
@@ -156,9 +153,8 @@ with tab_rec:
                 fecha_obj, _ = estandarizar_fecha(encontrado["fecha_nac"])
                 edad_actual = calcular_edad(fecha_obj) if fecha_obj else -1
                 
-                if edad_actual >= 18 and encontrado["es_menor"] == "SI":
+                if edad_actual >= 18 and encontrado.get("es_menor") == "SI":
                     encontrado["es_menor"] = "NO"
-                    encontrado["contacto"] = "N/A (Alcanzó mayoría de edad)"
                     encontrado["ultima_verificacion"] = datetime.now().strftime("%d/%m/%Y")
                     guardar_base_datos(st.session_state.db)
 
@@ -168,15 +164,15 @@ with tab_rec:
                 st.write(f"**Edad Actual:** {edad_actual} años" if edad_actual != -1 else "**Edad Actual:** Error en formato guardado")
                 st.caption(f"🕒 *Dato verificado por última vez el: {encontrado.get('ultima_verificacion', 'Desconocido')}*")
                 
-                if encontrado["es_menor"] == "SI":
+                if encontrado.get("es_menor") == "SI":
                     st.toast('¡ATENCIÓN! PACIENTE MENOR DE EDAD', icon='🚨')
-                    st.error(f"🚨 **¡ALERTA CRÍTICA: PACIENTE MENOR DE EDAD!** 🚨\n\n📞 **Contacto de Encargado Legal:** {encontrado['contacto']}")
+                    st.error(f"🚨 **¡ALERTA CRÍTICA: PACIENTE MENOR DE EDAD!** 🚨\n\n📞 **Contacto Legal:** {encontrado.get('contacto', 'N/D')}")
                 else:
-                    st.success("✔ Estado: Mayor de edad. No requiere contacto de emergencia.")
+                    st.info(f"📞 **Contacto de Emergencia:** {encontrado.get('contacto', 'N/D')}")
                 
                 st.markdown("---")
                 cedula_limpia = str(encontrado['cedula']).strip().replace("-", "").replace(" ", "")
-                categoria_edad_url = "Menor de edad" if encontrado['es_menor'] == "SI" else "Mayor de edad"
+                categoria_edad_url = "Menor de edad" if encontrado.get('es_menor') == "SI" else "Mayor de edad"
                 
                 url_cedula = urllib.parse.quote(cedula_limpia)
                 url_categoria = urllib.parse.quote(categoria_edad_url)
@@ -202,6 +198,7 @@ with tab_ges:
             
     st.write("---")
     st.link_button("📊 Abrir Base de Datos Central (Google Sheets)", url="https://docs.google.com/spreadsheets/d/1UAWXhHxnvRpGMfnfvSDizyfsdi0Dd7r10LyEzuSmMz4/edit?usp=sharing")
+    st.write("---")
     
     col_export_1, col_export_2 = st.columns([3, 1])
     with col_export_1:
@@ -236,7 +233,7 @@ with tab_ges:
             edit_carne = st.text_input("Carné / Código:", value=str(reg["carne"]))
             edit_nombre = st.text_input("Nombre Completo:", value=str(reg["nombre"]))
             edit_fnac = st.text_input("Fecha de Nacimiento (DD/MM/YYYY):", value=str(reg["fecha_nac"]))
-            edit_contacto = st.text_input("Contacto Emergencia:", value=str(reg["contacto"]))
+            edit_contacto = st.text_input("Contacto Emergencia (Obligatorio):", value=str(reg.get("contacto", "")))
             
             col1, col2 = st.columns(2)
             with col1:
@@ -244,29 +241,28 @@ with tab_ges:
                     fecha_obj, fecha_formateada = estandarizar_fecha(edit_fnac)
                     
                     if not fecha_obj:
-                        st.error("Formato de fecha incorrecto. Use DD/MM/YYYY o DD-MM-YYYY.")
+                        st.error("Formato de fecha incorrecto. Use DD/MM/YYYY.")
+                    elif not edit_contacto.strip():
+                        st.error("El contacto de emergencia no puede quedar vacío.")
                     else:
                         edad = calcular_edad(fecha_obj)
                         es_menor = "SI" if edad < 18 else "NO"
                         
-                        if es_menor == "SI" and not edit_contacto.strip():
-                            st.error("Debe ingresar un número de contacto para menores de edad.")
-                        else:
-                            for p in st.session_state.db:
-                                if str(p["cedula"]) == str(reg["cedula"]):
-                                    p["carne"] = edit_carne.strip()
-                                    p["nombre"] = edit_nombre.strip()
-                                    p["fecha_nac"] = fecha_formateada
-                                    p["es_menor"] = es_menor
-                                    p["contacto"] = edit_contacto.strip() if es_menor == "SI" else "N/A (Mayor de edad)"
-                                    p["ultima_verificacion"] = datetime.now().strftime("%d/%m/%Y")
-                            guardar_base_datos(st.session_state.db)
-                            st.success("Registro actualizado con éxito en la nube.")
-                            time.sleep(2.5)
-                            st.session_state.registro_editar = None
-                            if 'ges_query' in st.session_state:
-                                del st.session_state['ges_query']
-                            st.rerun()
+                        for p in st.session_state.db:
+                            if str(p["cedula"]) == str(reg["cedula"]):
+                                p["carne"] = edit_carne.strip()
+                                p["nombre"] = edit_nombre.strip()
+                                p["fecha_nac"] = fecha_formateada
+                                p["es_menor"] = es_menor
+                                p["contacto"] = edit_contacto.strip()
+                                p["ultima_verificacion"] = datetime.now().strftime("%d/%m/%Y")
+                        guardar_base_datos(st.session_state.db)
+                        st.success("Registro actualizado con éxito en la nube.")
+                        time.sleep(2.5)
+                        st.session_state.registro_editar = None
+                        if 'ges_query' in st.session_state:
+                            del st.session_state['ges_query']
+                        st.rerun()
             
             with col2:
                 if st.form_submit_button("🗑️ Eliminar Registro"):
