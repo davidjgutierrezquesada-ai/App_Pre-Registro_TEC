@@ -4,11 +4,14 @@ import time
 import csv
 import io
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import gspread
 from google.oauth2.service_account import Credentials
 
 st.set_page_config(page_title="Pre-Registro Inteligente - Clínica", page_icon="🏥", layout="centered")
+
+def obtener_hora_cr():
+    return datetime.now(timezone.utc) - timedelta(hours=6)
 
 def conectar_gsheets():
     scope = [
@@ -56,7 +59,7 @@ def estandarizar_fecha(fecha_str):
         return None, None
 
 def calcular_edad(fecha_obj):
-    hoy = datetime.now()
+    hoy = obtener_hora_cr()
     return hoy.year - fecha_obj.year - ((hoy.month, hoy.day) < (fecha_obj.month, fecha_obj.day))
 
 def generar_csv(datos):
@@ -103,7 +106,6 @@ with tab_enf:
             carne = st.text_input("Carné Institucional / Código Funcionario:")
             nombre = st.text_input("Nombre Completo:")
             fnac = st.text_input("Fecha de Nacimiento (DD/MM/YYYY):", placeholder="Ej: 08/06/2006")
-            # El contacto ahora es obligatorio para TODOS
             contacto = st.text_input("Contacto de Emergencia (Obligatorio para todos los pacientes):", placeholder="Nombre y Teléfono")
             
             submitted = st.form_submit_button("Guardar Pre-Registro")
@@ -125,7 +127,7 @@ with tab_enf:
                         "fecha_nac": fecha_formateada,
                         "contacto": contacto.strip(),
                         "es_menor": es_menor,
-                        "ultima_verificacion": datetime.now().strftime("%d/%m/%Y")
+                        "ultima_verificacion": obtener_hora_cr().strftime("%d/%m/%Y")
                     }
                     st.session_state.db.append(nuevo_registro)
                     guardar_base_datos(st.session_state.db)
@@ -155,7 +157,7 @@ with tab_rec:
                 
                 if edad_actual >= 18 and encontrado.get("es_menor") == "SI":
                     encontrado["es_menor"] = "NO"
-                    encontrado["ultima_verificacion"] = datetime.now().strftime("%d/%m/%Y")
+                    encontrado["ultima_verificacion"] = obtener_hora_cr().strftime("%d/%m/%Y")
                     guardar_base_datos(st.session_state.db)
 
                 st.markdown("### 📌 Datos del Paciente")
@@ -209,7 +211,7 @@ with tab_ges:
             st.download_button(
                 label="📥 Exportar DB a CSV",
                 data=csv_data,
-                file_name=f"Auditoria_Clinica_{datetime.now().strftime('%Y%m%d')}.csv",
+                file_name=f"Auditoria_Clinica_{obtener_hora_cr().strftime('%Y%m%d')}.csv",
                 mime="text/csv",
             )
 
@@ -255,7 +257,7 @@ with tab_ges:
                                 p["fecha_nac"] = fecha_formateada
                                 p["es_menor"] = es_menor
                                 p["contacto"] = edit_contacto.strip()
-                                p["ultima_verificacion"] = datetime.now().strftime("%d/%m/%Y")
+                                p["ultima_verificacion"] = obtener_hora_cr().strftime("%d/%m/%Y")
                         guardar_base_datos(st.session_state.db)
                         st.success("Registro actualizado con éxito en la nube.")
                         time.sleep(2.5)
